@@ -1,0 +1,971 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#080b14">
+  <meta name="description" content="Guess five-letter words in six tries across 12 languages. Free, endless Wordle-style gameplay.">
+  <title>Wordly — Five Letters, Six Tries</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23080b14'/%3E%3Crect x='10' y='10' width='44' height='44' rx='10' fill='%236ee7b7'/%3E%3Cpath d='M18 21l7 24h6l3-12 3 12h6l7-24h-7l-3 14-3-14h-6l-3 14-3-14z' fill='%23080b14'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --bg: #080b14;
+      --panel: rgba(20, 25, 42, .76);
+      --panel-strong: #151a2b;
+      --line: #2d344b;
+      --text: #f7f8ff;
+      --muted: #9199b4;
+      --accent: #6ee7b7;
+      --accent-dark: #052e24;
+      --correct: #22a06b;
+      --present: #d4a72c;
+      --absent: #41485d;
+      --danger: #fb7185;
+      --tile-size: clamp(3rem, 7.3vh, 4.25rem);
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      min-width: 300px;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 18% -10%, rgba(79, 70, 229, .18), transparent 32rem),
+        radial-gradient(circle at 90% 110%, rgba(16, 185, 129, .11), transparent 30rem),
+        var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, select { font: inherit; }
+
+    button { -webkit-tap-highlight-color: transparent; }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      width: min(100%, 52rem);
+      min-height: 100dvh;
+      margin: 0 auto;
+      padding: max(1rem, env(safe-area-inset-top)) clamp(.65rem, 3vw, 1.4rem) max(1rem, env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .topbar {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: .75rem;
+      padding-bottom: .8rem;
+      border-bottom: 1px solid rgba(145, 153, 180, .18);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .65rem;
+      font-size: clamp(1.25rem, 4vw, 1.65rem);
+      font-weight: 850;
+      letter-spacing: -.045em;
+    }
+
+    .brand-mark {
+      width: 2rem;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      color: var(--accent-dark);
+      background: var(--accent);
+      border-radius: .6rem;
+      font-size: 1rem;
+      box-shadow: 0 0 24px rgba(110, 231, 183, .22);
+    }
+
+    .round-label {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 750;
+      letter-spacing: .16em;
+      text-align: center;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .language-wrap { justify-self: end; position: relative; }
+
+    .language-select {
+      appearance: none;
+      min-height: 2.65rem;
+      padding: .55rem 2.2rem .55rem .8rem;
+      color: var(--text);
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: .8rem;
+      outline: none;
+      cursor: pointer;
+      font-size: .88rem;
+      font-weight: 700;
+    }
+
+    .language-wrap::after {
+      content: "⌄";
+      position: absolute;
+      right: .8rem;
+      top: 45%;
+      color: var(--muted);
+      pointer-events: none;
+      transform: translateY(-50%);
+    }
+
+    .language-select:focus-visible, .key:focus-visible, .coffee:focus-visible, .play-again:focus-visible {
+      outline: 3px solid rgba(110, 231, 183, .35);
+      outline-offset: 2px;
+    }
+
+    main {
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(.75rem, 2vh, 1.25rem);
+      padding: clamp(.75rem, 2vh, 1.5rem) 0;
+    }
+
+    .intro { text-align: center; }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.35rem, 4vw, 2rem);
+      line-height: 1.1;
+      letter-spacing: -.035em;
+    }
+
+    .hint {
+      min-height: 1.35rem;
+      margin: .35rem 0 0;
+      color: var(--muted);
+      font-size: .88rem;
+      font-weight: 550;
+    }
+
+    .board {
+      display: grid;
+      grid-template-rows: repeat(6, var(--tile-size));
+      gap: clamp(.28rem, .75vh, .42rem);
+      touch-action: manipulation;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(5, var(--tile-size));
+      gap: clamp(.28rem, .75vh, .42rem);
+    }
+
+    .tile {
+      position: relative;
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--line);
+      border-radius: clamp(.55rem, 1.4vh, .75rem);
+      background: rgba(16, 20, 34, .72);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+      font-size: clamp(1.45rem, 4.5vh, 2.15rem);
+      font-weight: 850;
+      line-height: 1;
+      text-transform: uppercase;
+      transform-style: preserve-3d;
+      user-select: none;
+    }
+
+    .tile.filled { border-color: #66708c; }
+    .tile.pop { animation: pop .12s ease-out; }
+    .tile.flip { animation: flip .58s ease both; }
+    .tile.correct { background: var(--correct); border-color: var(--correct); }
+    .tile.present { background: var(--present); border-color: var(--present); }
+    .tile.absent { background: var(--absent); border-color: var(--absent); }
+    .row.shake { animation: shake .42s ease-in-out; }
+    .row.win .tile { animation: bounce .62s ease both; }
+
+    .message {
+      position: fixed;
+      z-index: 20;
+      left: 50%;
+      top: max(5rem, calc(env(safe-area-inset-top) + 4.5rem));
+      max-width: calc(100vw - 2rem);
+      padding: .72rem 1rem;
+      color: #10131f;
+      background: var(--text);
+      border-radius: .8rem;
+      box-shadow: 0 12px 35px rgba(0,0,0,.35);
+      font-size: .9rem;
+      font-weight: 800;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -.75rem) scale(.96);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .message.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+
+    .game-tools {
+      width: min(24rem, 100%);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .6rem;
+    }
+
+    .tool-button {
+      min-height: 2.7rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .45rem;
+      padding: .55rem .75rem;
+      color: var(--text);
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: .75rem;
+      cursor: pointer;
+      font-size: .84rem;
+      font-weight: 800;
+      transition: transform .15s ease, border-color .15s ease, background .15s ease;
+    }
+
+    .tool-button:hover:not(:disabled) { background: #1d2337; border-color: #4a5574; transform: translateY(-1px); }
+    .tool-button:active:not(:disabled) { transform: translateY(1px); }
+    .tool-button:disabled { color: #7b839d; cursor: not-allowed; opacity: .68; }
+    .tool-icon { color: var(--accent); font-size: 1rem; }
+
+    .result-panel {
+      width: min(24rem, 100%);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: .75rem .85rem;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      box-shadow: 0 16px 45px rgba(0,0,0,.22);
+      animation: rise .3s ease both;
+    }
+
+    .result-panel.show { display: flex; }
+    .result-copy { min-width: 0; }
+    .result-title { margin: 0; font-size: .97rem; font-weight: 800; }
+    .answer { margin: .2rem 0 0; color: var(--accent); font-size: 1.15rem; font-weight: 900; letter-spacing: .15em; }
+
+    .play-again {
+      min-height: 2.65rem;
+      flex: 0 0 auto;
+      padding: .6rem 1rem;
+      color: var(--accent-dark);
+      background: var(--accent);
+      border: 0;
+      border-radius: .75rem;
+      cursor: pointer;
+      font-weight: 850;
+      transition: transform .16s ease, filter .16s ease;
+    }
+
+    .play-again:hover { filter: brightness(1.05); transform: translateY(-1px); }
+    .play-again:active { transform: translateY(1px); }
+
+    .keyboard {
+      width: min(42rem, 100%);
+      display: grid;
+      gap: .42rem;
+      user-select: none;
+    }
+
+    .key-row { display: flex; justify-content: center; gap: clamp(.2rem, 1vw, .38rem); }
+
+    .key {
+      height: clamp(2.7rem, 6.2vh, 3.45rem);
+      min-width: 0;
+      flex: 1 1 0;
+      padding: 0 .2rem;
+      color: var(--text);
+      background: #2a3042;
+      border: 0;
+      border-bottom: 2px solid #1b2030;
+      border-radius: .48rem;
+      cursor: pointer;
+      font-size: clamp(.7rem, 2.1vw, .9rem);
+      font-weight: 800;
+      text-transform: uppercase;
+      transition: background .22s ease, transform .08s ease;
+    }
+
+    .key.wide { flex: 1.5 1 0; font-size: clamp(.62rem, 1.7vw, .78rem); }
+    .key:hover { background: #353d54; }
+    .key:active { transform: translateY(2px); border-bottom-width: 0; }
+    .key.correct { background: var(--correct); border-color: #14734c; }
+    .key.present { background: var(--present); border-color: #9a7419; }
+    .key.absent { color: #a9afc1; background: #3a4051; border-color: #292e3c; }
+
+    html[data-language="ru"] .key,
+    html[data-language="pl"] .key { font-size: clamp(.62rem, 1.8vw, .82rem); }
+    html[data-language="ar"] .key { font-size: clamp(.82rem, 2.4vw, 1.05rem); }
+    html[dir="rtl"] .brand, html[dir="rtl"] .result-copy { direction: rtl; }
+    html[dir="rtl"] .tile { font-family: Tahoma, Arial, sans-serif; }
+
+    footer {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .35rem;
+      padding-top: .6rem;
+    }
+
+    .coffee {
+      display: inline-flex;
+      align-items: center;
+      gap: .52rem;
+      min-height: 2.75rem;
+      padding: .65rem 1rem;
+      color: #18120a;
+      background: #ffdd78;
+      border: 1px solid #ffe8a7;
+      border-radius: 999px;
+      box-shadow: 0 9px 26px rgba(255, 205, 79, .13);
+      font-size: .88rem;
+      font-weight: 850;
+      text-decoration: none;
+      transition: transform .16s ease, box-shadow .16s ease;
+    }
+
+    .coffee:hover { transform: translateY(-2px) rotate(-1deg); box-shadow: 0 12px 32px rgba(255, 205, 79, .2); }
+    .coffee-icon { font-size: 1.08rem; }
+    .data-credit { color: var(--muted); font-size: .75rem; text-decoration: none; }
+    .data-credit:hover { color: var(--text); text-decoration: underline; }
+
+    #confetti { position: fixed; z-index: 15; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    @keyframes pop { 50% { transform: scale(1.1); } }
+    @keyframes flip { 0% { transform: rotateX(0); } 48% { transform: rotateX(90deg); } 52% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+    @keyframes shake { 20%, 60% { transform: translateX(-.45rem); } 40%, 80% { transform: translateX(.45rem); } }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-.85rem); } 65% { transform: translateY(.12rem); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(.6rem); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 520px) {
+      :root { --tile-size: clamp(2.45rem, 11.2vw, 3.2rem); }
+      .app-shell { padding-top: max(.65rem, env(safe-area-inset-top)); padding-bottom: max(.65rem, env(safe-area-inset-bottom)); }
+      .round-label { display: none; }
+      .topbar { grid-template-columns: 1fr auto; }
+      main { justify-content: flex-start; gap: .5rem; padding: .5rem 0; }
+      .hint { margin-top: .2rem; font-size: .78rem; }
+      .language-select { max-width: 8.3rem; }
+      .result-panel { padding: .65rem; }
+      .game-tools { gap: .45rem; }
+      .tool-button { padding-inline: .5rem; font-size: .78rem; }
+      .key { height: 2.5rem; }
+      footer { gap: .2rem; padding-top: .25rem; }
+      .coffee { min-height: 2.35rem; padding-block: .35rem; }
+      .data-credit { display: none; }
+    }
+
+    @media (max-height: 720px) {
+      :root { --tile-size: clamp(2.35rem, 5.8vh, 3.05rem); }
+      .intro .hint { display: none; }
+      main { gap: .45rem; padding: .4rem 0; }
+      .tool-button { min-height: 2.35rem; padding-block: .35rem; }
+      .key { height: 2.45rem; }
+      footer { gap: .15rem; padding-top: .25rem; }
+      .coffee { min-height: 2.2rem; padding-block: .3rem; }
+      .data-credit { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">W</span><span>Wordly</span></div>
+      <div class="round-label" id="roundLabel">5 letters · 6 tries</div>
+      <div class="language-wrap">
+        <label for="language" class="sr-only" hidden>Language</label>
+        <select id="language" class="language-select" aria-label="Language selection">
+          <option value="en">🇬🇧 English</option>
+          <option value="tr">🇹🇷 Türkçe</option>
+          <option value="es">🇪🇸 Español</option>
+          <option value="de">🇩🇪 Deutsch</option>
+          <option value="fr">🇫🇷 Français</option>
+          <option value="pt">🇧🇷 Português</option>
+          <option value="it">🇮🇹 Italiano</option>
+          <option value="ru">🇷🇺 Русский</option>
+          <option value="ar">🇸🇦 العربية</option>
+          <option value="id">🇮🇩 Indonesia</option>
+          <option value="nl">🇳🇱 Nederlands</option>
+          <option value="pl">🇵🇱 Polski</option>
+        </select>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="gameTitle">
+        <h1 id="gameTitle">Find the word.</h1>
+        <p class="hint" id="hint">Five letters, six tries. Every row is a clue.</p>
+      </section>
+
+      <div id="message" class="message" role="status" aria-live="polite"></div>
+      <section id="board" class="board" aria-label="Guess board"></section>
+
+      <section class="game-tools" aria-label="Game assists">
+        <button id="changeWord" class="tool-button" type="button"><span class="tool-icon" aria-hidden="true">↻</span><span>Change Word</span></button>
+        <button id="letterHint" class="tool-button" type="button"><span class="tool-icon" aria-hidden="true">✦</span><span>Reveal One Letter</span></button>
+      </section>
+
+      <section id="resultPanel" class="result-panel" aria-live="polite">
+        <div class="result-copy">
+          <p id="resultTitle" class="result-title"></p>
+          <p id="answer" class="answer"></p>
+        </div>
+        <button id="playAgain" class="play-again" type="button">Play Again</button>
+      </section>
+
+      <section id="keyboard" class="keyboard" aria-label="On-screen keyboard"></section>
+    </main>
+
+    <footer>
+      <a class="coffee" href="https://buymeacoffee.com/razumuhin" target="_blank" rel="noopener noreferrer">
+        <span class="coffee-icon" aria-hidden="true">☕</span>
+        <span>Buy Me a Coffee</span>
+      </a>
+      <a class="data-credit" href="https://github.com/rspeer/wordfreq" target="_blank" rel="noopener noreferrer">Word data: wordfreq</a>
+    </footer>
+  </div>
+
+  <script src="words.js"></script>
+  <script>
+    "use strict";
+
+    const GAME = {
+      tr: {
+        words: ["BAHAR","BALIK","BARIŞ","BEBEK","BİBER","BİLET","BİLİM","BULUT","CEVAP","ÇİÇEK","ÇORAP","DENİZ","DURAK","DÜNYA","EKRAN","ELMAS","FENER","FIRÇA","GÖLGE","GÜNEŞ","HAYAL","İNCİR","KAHVE","KALEM","KAVUN","KİRAZ","KİTAP","KÖPEK","KUMRU","MASAL","MERAK","MEYVE","MUTLU","NEHİR","ORMAN","PAMUK","PASTA","RADYO","ROKET","SABAH","SAHİL","SAKIZ","SALON","ŞEKER","ŞEHİR","TARLA","YEMEK","ZAMAN"],
+        answers: ["BAHAR","BALIK","BARIŞ","BEBEK","BİBER","BİLET","BİLİM","BULUT","CEVAP","ÇİÇEK","ÇORAP","DENİZ","DURAK","DÜNYA","EKRAN","ELMAS","FENER","FIRÇA","GÖLGE","GÜNEŞ","HAYAL","İNCİR","KAHVE","KALEM","KAVUN","KİRAZ","KİTAP","KÖPEK","KUMRU","MASAL","MERAK","MEYVE","MUTLU","NEHİR","ORMAN","PAMUK","PASTA","RADYO","ROKET","SABAH","SAHİL","SAKIZ","SALON","ŞEKER","ŞEHİR","TARLA","YEMEK","ZAMAN"],
+        rows: ["ERTYUIOPĞÜ", "ASDFGHJKLŞİ", "ZXCVBNMÖÇ"],
+        locale: "tr-TR",
+        text: { title:"Kelimeyi bul.", hint:"Beş harf, altı deneme. Her satır bir ipucu.", round:"5 harf · 6 hak", enter:"GİR", back:"SİL", short:"Beş harf gerekli", invalid:"Kelime listede yok", win:"Harika bildin!", lose:"Kelime şuydu", again:"Yeniden Oyna", board:"Tahmin tahtası", keyboard:"Sanal klavye", language:"Dil seçimi", tools:"Oyun yardımları", change:"Kelimeyi Değiştir", changed:"Yeni kelime hazır", letterHint:"Bir Harf İpucu", hintReveal:"{n}. harf: {letter}" }
+      },
+      en: {
+        words: ["ABOUT","ABOVE","APPLE","BEACH","BRAIN","BREAD","BRICK","BRUSH","CHAIR","CHEST","CLOUD","DANCE","DREAM","EARTH","FLAME","FLOWER","FRAME","FRUIT","GHOST","GRAPE","GREEN","HEART","HOUSE","JUICE","KNIFE","LIGHT","MAGIC","MOUSE","MUSIC","NIGHT","OCEAN","PARTY","PLANT","PLATE","QUEEN","RIVER","ROBOT","SHINE","SMILE","SNAKE","SPACE","STONE","STORM","SUGAR","TABLE","TIGER","TRAIN","WATER","WORLD","YOUTH"],
+        answers: ["APPLE","BEACH","BRAIN","BREAD","BRICK","BRUSH","CHAIR","CLOUD","DANCE","DREAM","EARTH","FLAME","FRAME","FRUIT","GHOST","GRAPE","GREEN","HEART","HOUSE","JUICE","KNIFE","LIGHT","MAGIC","MOUSE","MUSIC","NIGHT","OCEAN","PARTY","PLANT","PLATE","QUEEN","RIVER","ROBOT","SHINE","SMILE","SNAKE","SPACE","STONE","STORM","SUGAR","TABLE","TIGER","TRAIN","WATER","WORLD","YOUTH"],
+        rows: ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"],
+        locale: "en-US",
+        text: { title:"Find the word.", hint:"Five letters, six tries. Every row is a clue.", round:"5 letters · 6 tries", enter:"ENTER", back:"DEL", short:"Enter five letters", invalid:"Word not in list", win:"Brilliant!", lose:"The word was", again:"Play Again", board:"Guess board", keyboard:"On-screen keyboard", language:"Language selection", tools:"Game assists", change:"Change Word", changed:"New word ready", letterHint:"Reveal One Letter", hintReveal:"Letter {n}: {letter}" }
+      },
+      es: {
+        words: ["ABEJA","ABRIL","AGUJA","AMIGO","ARBOL","ARENA","AVION","BARCO","BESOS","BOTAS","BRAZO","CALLE","CALOR","CAMPO","CARTA","CASAS","CLAVE","COCHE","COLOR","DULCE","FELIZ","FUEGO","GATOS","GLOBO","HIELO","JUEGO","LAPIZ","LIBRO","LIMON","LUNES","MADRE","MANOS","MARZO","NOCHE","NUBES","PERRO","PLAYA","QUESO","RELOJ","RUIDO","SALSA","SILLA","SUEÑO","TIGRE","TORRE","VERDE","VIAJE","VIDAS","ZORRO"],
+        answers: ["ABEJA","ABRIL","AGUJA","AMIGO","ARBOL","ARENA","AVION","BARCO","BESOS","BOTAS","BRAZO","CALLE","CALOR","CAMPO","CARTA","CASAS","CLAVE","COCHE","COLOR","DULCE","FELIZ","FUEGO","GATOS","GLOBO","HIELO","JUEGO","LAPIZ","LIBRO","LIMON","LUNES","MADRE","MANOS","MARZO","NOCHE","NUBES","PERRO","PLAYA","QUESO","RELOJ","RUIDO","SALSA","SILLA","SUEÑO","TIGRE","TORRE","VERDE","VIAJE","VIDAS","ZORRO"],
+        rows: ["QWERTYUIOP", "ASDFGHJKLÑ", "ZXCVBNM"],
+        locale: "es-ES",
+        text: { title:"Encuentra la palabra.", hint:"Cinco letras, seis intentos. Cada fila es una pista.", round:"5 letras · 6 intentos", enter:"OK", back:"BOR", short:"Escribe cinco letras", invalid:"La palabra no está", win:"¡Excelente!", lose:"La palabra era", again:"Jugar otra vez", board:"Tablero de intentos", keyboard:"Teclado en pantalla", language:"Selección de idioma", tools:"Ayudas de juego", change:"Cambiar palabra", changed:"Nueva palabra lista", letterHint:"Revelar una letra", hintReveal:"Letra {n}: {letter}" }
+      },
+      de: {
+        words: ["ABEND","ADLER","APFEL","AUGEN","BAUCH","BAUER","BLUME","BRIEF","CHAOS","DANKE","DECKE","ENGEL","FARBE","FEDER","FEUER","FISCH","FLUSS","FREUD","GLÜCK","HAFEN","HONIG","JUNGE","KATZE","KERZE","KLANG","KRAFT","KRONE","KÜSTE","LAMPE","LEBEN","LICHT","MONAT","MUSIK","NACHT","NATUR","PFERD","RADIO","REGEN","ROBOT","SONNE","SPIEL","STERN","STUHL","TASSE","TIGER","TRAUM","WOLKE"],
+        answers: ["ABEND","ADLER","APFEL","AUGEN","BAUCH","BAUER","BLUME","BRIEF","CHAOS","DANKE","DECKE","ENGEL","FARBE","FEDER","FEUER","FISCH","FLUSS","FREUD","GLÜCK","HAFEN","HONIG","JUNGE","KATZE","KERZE","KLANG","KRAFT","KRONE","KÜSTE","LAMPE","LEBEN","LICHT","MONAT","MUSIK","NACHT","NATUR","PFERD","RADIO","REGEN","ROBOT","SONNE","SPIEL","STERN","STUHL","TASSE","TIGER","TRAUM","WOLKE"],
+        rows: ["QWERTZUIOPÜ", "ASDFGHJKLÖÄ", "YXCVBNM"],
+        locale: "de-DE",
+        text: { title:"Finde das Wort.", hint:"Fünf Buchstaben, sechs Versuche. Jede Reihe ist ein Hinweis.", round:"5 Buchstaben · 6 Versuche", enter:"OK", back:"LÖS", short:"Fünf Buchstaben nötig", invalid:"Wort nicht in der Liste", win:"Großartig!", lose:"Das Wort war", again:"Nochmal spielen", board:"Ratefeld", keyboard:"Bildschirmtastatur", language:"Sprachauswahl", tools:"Spielhilfen", change:"Wort wechseln", changed:"Neues Wort bereit", letterHint:"Einen Buchstaben zeigen", hintReveal:"Buchstabe {n}: {letter}" }
+      },
+      fr: {
+        words: ["AIMER","AMOUR","AVION","BAGUE","BOIRE","BOULE","CARTE","CHAIR","CHAUD","CHIEN","CHOSE","COEUR","DANSE","DOUCE","ÉCOLE","FEMME","FLEUR","FORÊT","FRUIT","GLACE","GRAND","HERBE","IMAGE","JAUNE","JEUNE","JOUER","LIVRE","LUNDI","MAINS","MONDE","NUAGE","OCÉAN","PARLE","PLAGE","PLUIE","POMME","PORTE","RADIO","RÊVER","ROBOT","ROUGE","SUCRE","TABLE","TIGRE","TRAIN","VERRE","VILLE"],
+        answers: ["AIMER","AMOUR","AVION","BAGUE","BOIRE","BOULE","CARTE","CHAIR","CHAUD","CHIEN","CHOSE","COEUR","DANSE","DOUCE","ÉCOLE","FEMME","FLEUR","FORÊT","FRUIT","GLACE","GRAND","HERBE","IMAGE","JAUNE","JEUNE","JOUER","LIVRE","LUNDI","MAINS","MONDE","NUAGE","OCÉAN","PARLE","PLAGE","PLUIE","POMME","PORTE","RADIO","RÊVER","ROBOT","ROUGE","SUCRE","TABLE","TIGRE","TRAIN","VERRE","VILLE"],
+        rows: ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBNÉÈÊ"],
+        locale: "fr-FR",
+        text: { title:"Trouve le mot.", hint:"Cinq lettres, six essais. Chaque ligne est un indice.", round:"5 lettres · 6 essais", enter:"OK", back:"EFF", short:"Il faut cinq lettres", invalid:"Mot absent de la liste", win:"Formidable !", lose:"Le mot était", again:"Rejouer", board:"Grille de jeu", keyboard:"Clavier virtuel", language:"Choix de la langue", tools:"Aides de jeu", change:"Changer de mot", changed:"Nouveau mot prêt", letterHint:"Révéler une lettre", hintReveal:"Lettre {n} : {letter}" }
+      },
+      pt: {
+        words: ["AMIGO","CASAS","FELIZ","LIVRO","NOITE"], answers: ["AMIGO","CASAS","FELIZ","LIVRO","NOITE"],
+        rows: ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"], locale: "pt-BR",
+        text: { title:"Encontre a palavra.", hint:"Cinco letras, seis tentativas. Cada linha é uma pista.", round:"5 letras · 6 tentativas", enter:"OK", back:"APAG", short:"Digite cinco letras", invalid:"Palavra fora da lista", win:"Excelente!", lose:"A palavra era", again:"Jogar novamente", board:"Tabuleiro de tentativas", keyboard:"Teclado virtual", language:"Seleção de idioma", tools:"Ajudas do jogo", change:"Trocar palavra", changed:"Nova palavra pronta", letterHint:"Revelar uma letra", hintReveal:"Letra {n}: {letter}" }
+      },
+      it: {
+        words: ["AMICO","DONNA","FELCE","LIBRO","NOTTE"], answers: ["AMICO","DONNA","FELCE","LIBRO","NOTTE"],
+        rows: ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"], locale: "it-IT",
+        text: { title:"Trova la parola.", hint:"Cinque lettere, sei tentativi. Ogni riga è un indizio.", round:"5 lettere · 6 tentativi", enter:"OK", back:"CANC", short:"Servono cinque lettere", invalid:"Parola non presente", win:"Eccellente!", lose:"La parola era", again:"Gioca ancora", board:"Griglia dei tentativi", keyboard:"Tastiera virtuale", language:"Selezione lingua", tools:"Aiuti di gioco", change:"Cambia parola", changed:"Nuova parola pronta", letterHint:"Rivela una lettera", hintReveal:"Lettera {n}: {letter}" }
+      },
+      ru: {
+        words: ["СЛОВО","КНИГА","ЗЕМЛЯ","ОГОНЬ"], answers: ["СЛОВО","КНИГА","ЗЕМЛЯ","ОГОНЬ"],
+        rows: ["ЙЦУКЕНГШЩЗХ", "ФЫВАПРОЛДЖЭ", "ЯЧСМИТЬБЮЁ"], locale: "ru-RU",
+        text: { title:"Найдите слово.", hint:"Пять букв, шесть попыток. Каждая строка — подсказка.", round:"5 букв · 6 попыток", enter:"ВВОД", back:"СТЕР", short:"Нужно пять букв", invalid:"Слова нет в списке", win:"Отлично!", lose:"Это было слово", again:"Сыграть ещё", board:"Поле догадок", keyboard:"Экранная клавиатура", language:"Выбор языка", tools:"Подсказки", change:"Другое слово", changed:"Новое слово готово", letterHint:"Открыть букву", hintReveal:"Буква {n}: {letter}" }
+      },
+      ar: {
+        words: ["كلمات","جميلة"], answers: ["كلمات","جميلة"],
+        rows: ["ضصثقفغعهخحج", "شسيبلاتنمكط", "ئءؤرىةوزظذأإآ"], locale: "ar", dir: "rtl",
+        text: { title:"اعثر على الكلمة.", hint:"خمسة أحرف، ست محاولات. كل سطر يعطيك تلميحًا.", round:"٥ أحرف · ٦ محاولات", enter:"إدخال", back:"حذف", short:"أدخل خمسة أحرف", invalid:"الكلمة غير موجودة", win:"رائع!", lose:"الكلمة كانت", again:"العب مجددًا", board:"لوحة التخمين", keyboard:"لوحة المفاتيح", language:"اختيار اللغة", tools:"مساعدات اللعبة", change:"غيّر الكلمة", changed:"كلمة جديدة جاهزة", letterHint:"اكشف حرفًا", hintReveal:"الحرف {n}: {letter}" }
+      },
+      id: {
+        words: ["DUNIA","MALAM","TEMAN","WARNA"], answers: ["DUNIA","MALAM","TEMAN","WARNA"],
+        rows: ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"], locale: "id-ID",
+        text: { title:"Temukan katanya.", hint:"Lima huruf, enam kesempatan. Setiap baris adalah petunjuk.", round:"5 huruf · 6 kesempatan", enter:"OK", back:"HAPUS", short:"Masukkan lima huruf", invalid:"Kata tidak ada di daftar", win:"Hebat!", lose:"Kata yang benar", again:"Main lagi", board:"Papan tebakan", keyboard:"Papan ketik virtual", language:"Pilihan bahasa", tools:"Bantuan permainan", change:"Ganti kata", changed:"Kata baru siap", letterHint:"Buka satu huruf", hintReveal:"Huruf {n}: {letter}" }
+      },
+      nl: {
+        words: ["AVOND","GELUK","LICHT","WATER"], answers: ["AVOND","GELUK","LICHT","WATER"],
+        rows: ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"], locale: "nl-NL",
+        text: { title:"Vind het woord.", hint:"Vijf letters, zes pogingen. Elke rij is een aanwijzing.", round:"5 letters · 6 pogingen", enter:"OK", back:"WIS", short:"Vul vijf letters in", invalid:"Woord staat niet in de lijst", win:"Geweldig!", lose:"Het woord was", again:"Opnieuw spelen", board:"Raadbord", keyboard:"Schermtoetsenbord", language:"Taalkeuze", tools:"Spelhulp", change:"Ander woord", changed:"Nieuw woord klaar", letterHint:"Toon één letter", hintReveal:"Letter {n}: {letter}" }
+      },
+      pl: {
+        words: ["SŁOWO","KWIAT","MIAST","NOCNY","WODNY"], answers: ["SŁOWO","KWIAT","MIAST","NOCNY","WODNY"],
+        rows: ["QWERTYUIOPÓ", "ASDFGHJKLŁĄĘ", "ZXCVBNMĆŃŚŹŻ"], locale: "pl-PL",
+        text: { title:"Znajdź słowo.", hint:"Pięć liter, sześć prób. Każdy wiersz to wskazówka.", round:"5 liter · 6 prób", enter:"OK", back:"USUŃ", short:"Wpisz pięć liter", invalid:"Słowa nie ma na liście", win:"Świetnie!", lose:"Szukane słowo", again:"Zagraj ponownie", board:"Plansza zgadywania", keyboard:"Klawiatura ekranowa", language:"Wybór języka", tools:"Pomoc w grze", change:"Zmień słowo", changed:"Nowe słowo gotowe", letterHint:"Odkryj jedną literę", hintReveal:"Litera {n}: {letter}" }
+      }
+    };
+
+    if (window.WORDLY_WORDS) {
+      Object.keys(GAME).forEach(code => {
+        const source = window.WORDLY_WORDS[code];
+        if (source?.words?.length && source?.answers?.length) {
+          GAME[code].words = source.words;
+          GAME[code].answers = source.answers;
+        }
+      });
+    }
+
+    const MAX_ROWS = 6;
+    const WORD_LENGTH = 5;
+    const HISTORY_LIMIT = 14;
+    const statusRank = { absent: 1, present: 2, correct: 3 };
+
+    let language = localStorage.getItem("wordly-language") || "en";
+    if (!GAME[language]) language = "en";
+    let target = "";
+    let guesses = [];
+    let current = "";
+    let locked = false;
+    let finished = false;
+    let keyStates = {};
+    let gameId = 0;
+    let hintUsed = false;
+    let hintText = "";
+    let messageTimer;
+
+    const board = document.getElementById("board");
+    const keyboard = document.getElementById("keyboard");
+    const languageSelect = document.getElementById("language");
+    const resultPanel = document.getElementById("resultPanel");
+    const playAgain = document.getElementById("playAgain");
+    const changeWord = document.getElementById("changeWord");
+    const letterHint = document.getElementById("letterHint");
+    const gameTools = document.querySelector(".game-tools");
+    const message = document.getElementById("message");
+    const canvas = document.getElementById("confetti");
+    const ctx = canvas.getContext("2d");
+
+    function cleanPool(values) {
+      return [...new Set(values.filter(word => [...word].length === WORD_LENGTH))];
+    }
+
+    Object.values(GAME).forEach(data => {
+      data.words = cleanPool(data.words);
+      data.answers = cleanPool(data.answers);
+    });
+
+    function upper(value) {
+      return value.toLocaleUpperCase(GAME[language].locale);
+    }
+
+    function chooseWord() {
+      const historyKey = `wordly-history-${language}`;
+      let history = [];
+      try { history = JSON.parse(localStorage.getItem(historyKey)) || []; } catch (_) { history = []; }
+      const pool = GAME[language].answers;
+      const available = pool.filter(word => !history.includes(word));
+      const selectionPool = available.length ? available : pool;
+      const word = selectionPool[Math.floor(Math.random() * selectionPool.length)];
+      const nextHistory = [word, ...history.filter(item => item !== word)].slice(0, Math.min(HISTORY_LIMIT, Math.max(1, pool.length - 1)));
+      localStorage.setItem(historyKey, JSON.stringify(nextHistory));
+      return word;
+    }
+
+    function buildBoard() {
+      board.innerHTML = "";
+      for (let row = 0; row < MAX_ROWS; row++) {
+        const rowEl = document.createElement("div");
+        rowEl.className = "row";
+        rowEl.dataset.row = row;
+        rowEl.setAttribute("role", "group");
+        for (let col = 0; col < WORD_LENGTH; col++) {
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.dataset.col = col;
+          tile.setAttribute("aria-label", `${row + 1}. satır ${col + 1}. harf`);
+          rowEl.appendChild(tile);
+        }
+        board.appendChild(rowEl);
+      }
+    }
+
+    function makeKey(label, value, wide = false) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `key${wide ? " wide" : ""}`;
+      button.textContent = label;
+      button.dataset.key = value;
+      button.setAttribute("aria-label", value === "ENTER" ? GAME[language].text.enter : value === "BACKSPACE" ? GAME[language].text.back : label);
+      button.addEventListener("click", () => handleKey(value));
+      return button;
+    }
+
+    function buildKeyboard() {
+      keyboard.innerHTML = "";
+      GAME[language].rows.forEach((letters, index) => {
+        const row = document.createElement("div");
+        row.className = "key-row";
+        if (index === 2) row.appendChild(makeKey(GAME[language].text.enter, "ENTER", true));
+        [...letters].forEach(letter => row.appendChild(makeKey(letter, letter)));
+        if (index === 2) row.appendChild(makeKey("⌫", "BACKSPACE", true));
+        keyboard.appendChild(row);
+      });
+    }
+
+    function applyLanguage() {
+      const t = GAME[language].text;
+      document.documentElement.lang = language;
+      document.documentElement.dir = GAME[language].dir || "ltr";
+      document.documentElement.dataset.language = language;
+      document.title = `Wordly — ${t.title}`;
+      languageSelect.value = language;
+      languageSelect.setAttribute("aria-label", t.language);
+      document.getElementById("gameTitle").textContent = t.title;
+      document.getElementById("hint").textContent = t.hint;
+      document.getElementById("roundLabel").textContent = t.round;
+      board.setAttribute("aria-label", t.board);
+      keyboard.setAttribute("aria-label", t.keyboard);
+      gameTools.setAttribute("aria-label", t.tools);
+      playAgain.textContent = t.again;
+      updateActionButtons();
+    }
+
+    function updateActionButtons() {
+      const t = GAME[language].text;
+      changeWord.querySelector("span:last-child").textContent = t.change;
+      letterHint.querySelector("span:last-child").textContent = hintUsed ? hintText : t.letterHint;
+      changeWord.disabled = locked;
+      letterHint.disabled = locked || finished || hintUsed;
+    }
+
+    function newGame() {
+      gameId++;
+      target = chooseWord();
+      guesses = [];
+      current = "";
+      locked = false;
+      finished = false;
+      keyStates = {};
+      hintUsed = false;
+      hintText = "";
+      resultPanel.classList.remove("show");
+      document.getElementById("answer").textContent = "";
+      buildBoard();
+      buildKeyboard();
+      applyLanguage();
+    }
+
+    function useLetterHint() {
+      if (locked || finished || hintUsed) return;
+      const targetLetters = [...target];
+      const unknown = targetLetters
+        .map((_, index) => index)
+        .filter(index => !guesses.some(guess => [...guess][index] === targetLetters[index]));
+      const choices = unknown.length ? unknown : targetLetters.map((_, index) => index);
+      const index = choices[Math.floor(Math.random() * choices.length)];
+      hintUsed = true;
+      hintText = GAME[language].text.hintReveal
+        .replace("{n}", String(index + 1))
+        .replace("{letter}", targetLetters[index]);
+      updateActionButtons();
+      showMessage(hintText);
+    }
+
+    function changeCurrentWord() {
+      if (locked) return;
+      newGame();
+      showMessage(GAME[language].text.changed);
+    }
+
+    function updateCurrentRow(animateIndex = -1) {
+      const row = board.children[guesses.length];
+      if (!row) return;
+      [...row.children].forEach((tile, index) => {
+        tile.textContent = [...current][index] || "";
+        tile.classList.toggle("filled", index < [...current].length);
+        tile.classList.remove("pop");
+        if (index === animateIndex) {
+          void tile.offsetWidth;
+          tile.classList.add("pop");
+        }
+      });
+    }
+
+    function showMessage(text) {
+      clearTimeout(messageTimer);
+      message.textContent = text;
+      message.classList.add("show");
+      messageTimer = setTimeout(() => message.classList.remove("show"), 1750);
+    }
+
+    function shakeRow() {
+      const row = board.children[guesses.length];
+      if (!row) return;
+      row.classList.remove("shake");
+      void row.offsetWidth;
+      row.classList.add("shake");
+    }
+
+    function scoreGuess(guess, answer) {
+      const result = Array(WORD_LENGTH).fill("absent");
+      const remaining = {};
+      const guessLetters = [...guess];
+      const answerLetters = [...answer];
+
+      answerLetters.forEach((letter, index) => {
+        if (guessLetters[index] === letter) result[index] = "correct";
+        else remaining[letter] = (remaining[letter] || 0) + 1;
+      });
+
+      guessLetters.forEach((letter, index) => {
+        if (result[index] === "correct") return;
+        if (remaining[letter] > 0) {
+          result[index] = "present";
+          remaining[letter]--;
+        }
+      });
+      return result;
+    }
+
+    function updateKey(letter, status) {
+      if (!keyStates[letter] || statusRank[status] > statusRank[keyStates[letter]]) keyStates[letter] = status;
+      keyboard.querySelectorAll(".key").forEach(key => {
+        if (key.dataset.key === letter) {
+          key.classList.remove("correct", "present", "absent");
+          key.classList.add(keyStates[letter]);
+        }
+      });
+    }
+
+    function submitGuess() {
+      const t = GAME[language].text;
+      if ([...current].length !== WORD_LENGTH) {
+        showMessage(t.short);
+        shakeRow();
+        return;
+      }
+      if (!GAME[language].words.includes(current)) {
+        showMessage(t.invalid);
+        shakeRow();
+        return;
+      }
+
+      locked = true;
+      updateActionButtons();
+      const rowIndex = guesses.length;
+      const guess = current;
+      const result = scoreGuess(guess, target);
+      const submittedGame = gameId;
+      const row = board.children[rowIndex];
+      guesses.push(guess);
+      current = "";
+
+      [...row.children].forEach((tile, index) => {
+        setTimeout(() => {
+          if (submittedGame !== gameId) return;
+          tile.classList.add("flip");
+          setTimeout(() => {
+            if (submittedGame !== gameId) return;
+            tile.classList.add(result[index]);
+            updateKey([...guess][index], result[index]);
+          }, 250);
+        }, index * 260);
+      });
+
+      const revealDuration = (WORD_LENGTH - 1) * 260 + 620;
+      setTimeout(() => {
+        if (submittedGame !== gameId) return;
+        const won = guess === target;
+        const lost = !won && guesses.length === MAX_ROWS;
+        if (won || lost) finishGame(won, row);
+        else {
+          locked = false;
+          updateActionButtons();
+        }
+      }, revealDuration);
+    }
+
+    function finishGame(won, row) {
+      finished = true;
+      locked = false;
+      updateActionButtons();
+      const t = GAME[language].text;
+      document.getElementById("resultTitle").textContent = won ? t.win : t.lose;
+      document.getElementById("answer").textContent = target;
+      resultPanel.classList.add("show");
+      if (won) {
+        row.classList.add("win");
+        [...row.children].forEach((tile, index) => tile.style.animationDelay = `${index * 80}ms`);
+        launchConfetti();
+      }
+      setTimeout(() => playAgain.focus({ preventScroll: true }), 120);
+    }
+
+    function handleKey(rawKey) {
+      if (locked || finished) return;
+      const command = String(rawKey).toUpperCase();
+      if (command === "ENTER") return submitGuess();
+      if (command === "BACKSPACE" || command === "DELETE") {
+        current = [...current].slice(0, -1).join("");
+        updateCurrentRow();
+        return;
+      }
+      let letter = String(rawKey);
+      if (language === "es") letter = letter.replace(/ñ/gi, "\uE000");
+      if (["es", "fr", "pt", "it"].includes(language)) {
+        letter = letter.normalize("NFD").replace(/\p{M}/gu, "").replace("\uE000", "Ñ");
+      }
+      const key = upper(letter);
+      if ([...key].length === 1 && /^\p{L}$/u.test(key) && [...current].length < WORD_LENGTH) {
+        current += key;
+        updateCurrentRow([...current].length - 1);
+      }
+    }
+
+    function launchConfetti() {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduceMotion) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = innerWidth * dpr;
+      canvas.height = innerHeight * dpr;
+      canvas.style.width = `${innerWidth}px`;
+      canvas.style.height = `${innerHeight}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const colors = ["#6ee7b7", "#fde68a", "#818cf8", "#fb7185", "#f7f8ff"];
+      const pieces = Array.from({ length: 115 }, () => ({
+        x: innerWidth * (.15 + Math.random() * .7), y: innerHeight * .28,
+        vx: (Math.random() - .5) * 11, vy: -4 - Math.random() * 9,
+        size: 4 + Math.random() * 7, color: colors[Math.floor(Math.random() * colors.length)],
+        spin: Math.random() * Math.PI, spinSpeed: (Math.random() - .5) * .3
+      }));
+      const started = performance.now();
+      function frame(now) {
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        pieces.forEach(piece => {
+          piece.x += piece.vx;
+          piece.vy += .18;
+          piece.y += piece.vy;
+          piece.spin += piece.spinSpeed;
+          ctx.save();
+          ctx.translate(piece.x, piece.y);
+          ctx.rotate(piece.spin);
+          ctx.fillStyle = piece.color;
+          ctx.fillRect(-piece.size / 2, -piece.size / 3, piece.size, piece.size * .62);
+          ctx.restore();
+        });
+        if (now - started < 2600) requestAnimationFrame(frame);
+        else ctx.clearRect(0, 0, innerWidth, innerHeight);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    function registerWebMCPTools() {
+      const context = document.modelContext;
+      if (!context?.registerTool) return;
+
+      const reportRegistrationError = error => console.warn("WebMCP tool registration failed", error);
+
+      try {
+        Promise.resolve(context.registerTool({
+          name: "read_word_game_state",
+          title: "Read Wordly game state",
+          description: "Read the selected language, completed guesses, remaining tries, and whether the visible Wordly game is finished.",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+          annotations: { readOnlyHint: true, untrustedContentHint: false },
+          execute() {
+            return {
+              language,
+              guesses: [...guesses],
+              remainingTries: Math.max(0, MAX_ROWS - guesses.length),
+              finished
+            };
+          }
+        })).catch(reportRegistrationError);
+
+        Promise.resolve(context.registerTool({
+          name: "submit_word_guess",
+          title: "Submit a Wordly guess",
+          description: "Submit one valid five-letter guess to the visible Wordly board in the currently selected language.",
+          inputSchema: {
+            type: "object",
+            properties: { word: { type: "string", description: "A five-letter word in the current game language." } },
+            required: ["word"],
+            additionalProperties: false
+          },
+          annotations: { readOnlyHint: false, untrustedContentHint: false },
+          async execute(input) {
+            if (locked) throw new Error("The board is still revealing the previous guess.");
+            if (finished) throw new Error("This game is finished. Start a new game first.");
+            const word = upper(String(input?.word || "").trim());
+            if ([...word].length !== WORD_LENGTH) throw new Error("The guess must contain exactly five letters.");
+            if (!GAME[language].words.includes(word)) throw new Error("The guess is not in the current language list.");
+            current = word;
+            updateCurrentRow();
+            submitGuess();
+            await new Promise(resolve => setTimeout(resolve, 1750));
+            return {
+              accepted: true,
+              guess: word,
+              guessNumber: guesses.length,
+              finished,
+              won: finished && word === target
+            };
+          }
+        })).catch(reportRegistrationError);
+      } catch (error) {
+        reportRegistrationError(error);
+      }
+    }
+
+    document.addEventListener("keydown", event => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key === "Enter" || event.key === "Backspace" || event.key === "Delete" || event.key.length === 1) {
+        event.preventDefault();
+        handleKey(event.key === "Enter" ? "ENTER" : event.key.toUpperCase() === "BACKSPACE" ? "BACKSPACE" : event.key);
+      }
+    });
+
+    languageSelect.addEventListener("change", event => {
+      language = event.target.value;
+      localStorage.setItem("wordly-language", language);
+      applyLanguage();
+      newGame();
+    });
+
+    playAgain.addEventListener("click", newGame);
+    changeWord.addEventListener("click", changeCurrentWord);
+    letterHint.addEventListener("click", useLetterHint);
+    window.addEventListener("resize", () => ctx.clearRect(0, 0, canvas.width, canvas.height));
+
+    applyLanguage();
+    newGame();
+    registerWebMCPTools();
+  </script>
+</body>
+</html>
