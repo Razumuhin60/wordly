@@ -1,16 +1,14 @@
-# Wordly
+Wordly
 
 Wordly is a free, multilingual, Wordle-style browser game. Guess a five-letter
 word in six tries, switch between 12 languages, and start a new round whenever
 you want.
 
-## Play
+## Play Wordly
 
-After enabling GitHub Pages, the game will be available at:
+**[Play Wordly online](https://razumuhin60.github.io/wordly/)**
 
-`https://YOUR_USERNAME.github.io/wordly/`
-
-Replace `YOUR_USERNAME` with your GitHub username.
+No download, registration, or installation is required.
 
 ## Features
 
@@ -29,10 +27,22 @@ Replace `YOUR_USERNAME` with your GitHub username.
 - Responsive dark interface with right-to-left Arabic support
 - No backend, account, build step, or paid hosting required
 
+## How to play
+
+1. Enter a five-letter word using your keyboard or the on-screen keyboard.
+2. Submit the word to reveal the result for each letter.
+3. Green means the letter is correct and in the right position.
+4. Yellow means the letter is in the word but in a different position.
+5. Gray means the letter is not in the word.
+6. Find the answer within six guesses.
+
+Each round includes one optional letter hint. You can also change the current
+word or start a new round immediately after the game ends.
+
 ## Run locally
 
-Serve this directory with any static HTTP server, then open `index.html` through
-that server. For example, if Python is installed:
+Serve this directory with any static HTTP server. For example, if Python is
+installed:
 
 ```bash
 python -m http.server 4173
@@ -42,23 +52,22 @@ Then visit `http://localhost:4173/`.
 
 ## Deploy with GitHub Pages
 
-1. Create a public GitHub repository named `wordly`.
-2. Upload the contents of this project to the repository root.
-3. Open **Settings → Pages**.
-4. Select **Deploy from a branch**.
-5. Choose the `main` branch and the `/(root)` folder.
-6. Save and wait for GitHub Pages to publish the site.
+1. Upload the project files to the root of a public GitHub repository.
+2. Open **Settings → Pages**.
+3. Select **Deploy from a branch**.
+4. Choose the `main` branch and the `/(root)` folder.
+5. Save and wait for GitHub Pages to publish the site.
 
-The live URL will be `https://YOUR_USERNAME.github.io/wordly/`.
+This repository is published at:
+
+`https://razumuhin60.github.io/wordly/`
 
 ## Project structure
 
 ```text
 index.html                    Game interface, styling, and game logic
 words.js                      Generated multilingual word dictionaries
-scripts/generate_words.py     Dictionary generation script
-scripts/build_answer_exclusions.py
-scripts/answer_exclusions.json
+README.md                     Project information and instructions
 requirements-wordlist.txt     Word-list generation dependencies
 THIRD_PARTY_NOTICES.md        Dataset sources and license notices
 ```
@@ -67,8 +76,15 @@ THIRD_PARTY_NOTICES.md        Dataset sources and license notices
 
 The accepted-guess dictionaries are derived from `wordfreq`. Answer-only
 filters use name and place data to prevent proper nouns and location names from
-being selected as puzzles. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-for sources and licensing details.
+being selected as puzzles. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for source and licensing
+details.
+
+## Privacy
+
+Wordly does not require an account and does not send gameplay history to a
+server. The selected language and recently played words are stored locally in
+the player's browser to remember preferences and reduce repetition.
 
 ## Support
 
